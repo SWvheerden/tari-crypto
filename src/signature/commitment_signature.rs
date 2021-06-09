@@ -53,11 +53,6 @@ pub struct CommitmentSignature<P, K, C> {
     _commitment_factory: PhantomData<C>,
 }
 
-// C = a*H + x*G     ... (Pedersen commitment to the value 'a')
-// R = k_2*H + k_1*G
-// u = k_1 + e.x
-// v = k_2 + e.a
-// signature = (R, u, v)
 impl<P, K, C> CommitmentSignature<P, K, C>
 where
     P: PublicKey<K = K>,
@@ -73,12 +68,20 @@ where
         }
     }
 
+    /// This is the left-hand side of the signature verification equation
     pub fn calc_signature_verifier(&self) -> HomomorphicCommitment<P> {
         // v*H + u*G = Commitment
         let factory = C::default();
         factory.commit(&self.signature_u, &self.signature_v)
     }
 
+    /// Sign the provided challenge with the value commitment's value and blinding factor. The two nonces should be
+    /// completely random and never reused - that responsibility lies with the calling function.
+    ///   C = a*H + x*G          ... (Pedersen commitment to the value 'a' using blinding factor 'x')
+    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment nonce created with the two random nonces)
+    ///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
+    ///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
+    ///   signature = (R, u, v)  ... (the final signature tuple)
     pub fn sign(
         secret_a: K,
         secret_x: K,
@@ -105,6 +108,8 @@ where
         Ok(Self::new(public_commitment_nonce, u, v))
     }
 
+    /// Verify if the commitment signature signed the commitment using the specified challenge (as bytes). If the
+    /// provided challenge n bytes cannot be converted to a secret key, this function also returns false.
     pub fn verify_challenge<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &[u8]) -> bool
     where
         for<'b> &'b K: Mul<&'a HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
@@ -118,6 +123,8 @@ where
         self.verify(public_commitment, &e)
     }
 
+    /// Verify if the commitment signature signed the commitment using the specified challenge (as secret key).
+    ///   v*H + u*G = R + e.C
     pub fn verify<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &K) -> bool
     where
         for<'b> &'b K: Mul<&'a HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
@@ -129,21 +136,25 @@ where
         lhs == rhs
     }
 
+    /// This function returns the two publicly known private keys of the signature tuple (u, v)
     #[inline]
-    pub fn get_signature(&self) -> (&K, &K) {
-        (&self.signature_u, &self.signature_v)
+    pub fn get_complete_signature_tuple(&self) -> (&HomomorphicCommitment<P>, &K, &K) {
+        (&self.public_commitment_nonce, &self.signature_u, &self.signature_v)
     }
 
+    /// This function returns the first publicly known private key of the signature tuple (u)
     #[inline]
     pub fn get_signature_u(&self) -> &K {
         &self.signature_u
     }
 
+    /// This function returns the second publicly known private key of the signature tuple (v)
     #[inline]
     pub fn get_signature_v(&self) -> &K {
         &self.signature_v
     }
 
+    /// This function returns the public commitment nonce key of the signature tuple (R)
     #[inline]
     pub fn get_public_commitment_nonce(&self) -> &HomomorphicCommitment<P> {
         &self.public_commitment_nonce

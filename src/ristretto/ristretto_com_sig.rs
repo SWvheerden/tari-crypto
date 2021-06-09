@@ -29,12 +29,13 @@ use crate::ristretto::pedersen::PedersenCommitmentFactory;
 
 /// # A Commitment signature implementation on Ristretto
 ///
-/// Find out more about [Commitment signatures](https://tlu.tarilabs.com/cryptography/digital_signatures/introduction.html).
+/// Find out more about Commitment signatures [here](https://eprint.iacr.org/2020/061.pdf) and
+/// [here](https://documents.uow.edu.au/~wsusilo/ZCMS_IJNS08.pdf).
 ///
-/// `RistrettoSchnorr` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
-/// implementation of `ristretto255` to provide Schnorr signature functionality.
+/// `RistrettoComSig` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
+/// implementation of `ristretto255` to provide Commitment Signature functionality utlizing Schnorr signatures.
 ///
-/// In short, a Schnorr sig is made up of the pair _(R, s)_, where _R_ is a public key (of a secret nonce) and _s_ is
+/// In short, a Commitment Signature signature is made up of the tuple _(R, u, v)_, where _R_ is a public key (of a secret nonce) and _s_ is
 /// the signature.
 ///
 /// ## Creating signatures
