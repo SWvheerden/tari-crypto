@@ -24,9 +24,9 @@ pub mod constants;
 pub mod dalek_range_proof;
 pub mod musig;
 pub mod pedersen;
+pub mod ristretto_com_sig;
 pub mod ristretto_keys;
 pub mod ristretto_sig;
-pub mod ristretto_com_sig;
 pub mod script_commitment;
 pub mod serialize;
 pub mod utils;
@@ -40,4 +40,3 @@ pub use self::{
 // test modules
 #[cfg(test)]
 mod test_common;
-

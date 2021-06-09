@@ -22,8 +22,10 @@
 
 use crate::{
     ristretto::{RistrettoPublicKey, RistrettoSecretKey},
-    signature::CommitmentSignature,
+    signature::commitment_signature::CommitmentSignature,
 };
+use crate::ristretto::pedersen::PedersenCommitmentFactory;
+
 
 /// # A Commitment signature implementation on Ristretto
 ///
@@ -96,7 +98,7 @@ use crate::{
 /// let e = Blake256::digest(b"Maskerade");
 /// assert!(sig.verify_challenge(&P, &e));
 /// ```
-pub type RistrettoSchnorr = SchnorrSignature<RistrettoPublicKey, RistrettoSecretKey>;
+pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey, PedersenCommitmentFactory>;
 
 #[cfg(test)]
 mod test {
