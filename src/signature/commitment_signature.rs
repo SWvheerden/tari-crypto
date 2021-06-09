@@ -136,7 +136,7 @@ where
         lhs == rhs
     }
 
-    /// This function returns the two publicly known private keys of the signature tuple (u, v)
+    /// This function returns the complete signature tuple (R, u, v)
     #[inline]
     pub fn get_complete_signature_tuple(&self) -> (&HomomorphicCommitment<P>, &K, &K) {
         (&self.public_commitment_nonce, &self.signature_u, &self.signature_v)
@@ -154,7 +154,7 @@ where
         &self.signature_v
     }
 
-    /// This function returns the public commitment nonce key of the signature tuple (R)
+    /// This function returns the public commitment nonce of the signature tuple (R)
     #[inline]
     pub fn get_public_commitment_nonce(&self) -> &HomomorphicCommitment<P> {
         &self.public_commitment_nonce

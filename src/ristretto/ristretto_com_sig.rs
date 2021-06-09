@@ -33,69 +33,70 @@ use crate::{
 /// `RistrettoComSig` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
 /// implementation of `ristretto255` to provide Commitment Signature functionality utlizing Schnorr signatures.
 ///
-/// In short, a Commitment Signature signature is made up of the tuple _(R, u, v)_, where _R_ is a public key (of a
-/// secret nonce) and _s_ is the signature.
+/// In short, a Commitment Signature is made up of the tuple _(R, u, v)_, where _R_ is a random Pedersen commitment (of
+/// two secret nonces) and _u_ and _v_ are the two publicly known private keys.
 ///
 /// ## Creating signatures
 ///
-/// You can create a `RisrettoSchnorr` from it's component parts:
+/// You can create a `RistrettoComSig` from it's component parts:
 ///
 /// ```edition2018
 /// # use tari_crypto::ristretto::*;
 /// # use tari_crypto::keys::*;
-/// # use tari_crypto::signatures::SchnorrSignature;
+/// # use tari_crypto::commitment::HomomorphicCommitment;
 /// # use tari_utilities::ByteArray;
 /// # use tari_utilities::hex::Hex;
 ///
-/// let public_r = RistrettoPublicKey::from_hex("6a493210f7499cd17fecb510ae0cea23a110e8d5b901f8acadd3095c73a3b919").unwrap();
-/// let s = RistrettoSecretKey::from_bytes(b"10000000000000000000000000000000").unwrap();
-/// let sig = RistrettoSchnorr::new(public_r, s);
+/// let r_pub_key = RistrettoPublicKey::from_hex("8063d85e151abee630e643e2b3dc47bfaeb8aa859c9d10d60847985f286aad19").unwrap();
+/// let r_pub = HomomorphicCommitment::from_public_key(&r_pub_key);
+/// let u = RistrettoSecretKey::from_bytes(b"10000000000000000000000010000000").unwrap();
+/// let v = RistrettoSecretKey::from_bytes(b"a00000000000000000000000a0000000").unwrap();
+/// let sig = RistrettoComSig::new(r_pub, u, v);
 /// ```
 ///
-/// or you can create a signature by signing a message:
+/// or you can create a signature by signing a message with knowledge of a commitment:
 ///
 /// ```rust
 /// # use tari_crypto::ristretto::*;
 /// # use tari_crypto::keys::*;
-/// # use tari_crypto::signatures::SchnorrSignature;
 /// # use tari_crypto::common::*;
 /// # use digest::Digest;
 ///
-/// fn get_keypair() -> (RistrettoSecretKey, RistrettoPublicKey) {
-///     let mut rng = rand::thread_rng();
-///     let k = RistrettoSecretKey::random(&mut rng);
-///     let pk = RistrettoPublicKey::from_secret_key(&k);
-///     (k, pk)
-/// }
-///
-/// #[allow(non_snake_case)]
-/// let (k, P) = get_keypair();
-/// let (r, R) = get_keypair();
+/// let mut rng = rand::thread_rng();
+/// let a_val = RistrettoSecretKey::random(&mut rng);
+/// let x_val = RistrettoSecretKey::random(&mut rng);
+/// let a_nonce = RistrettoSecretKey::random(&mut rng);
+/// let x_nonce = RistrettoSecretKey::random(&mut rng);
 /// let e = Blake256::digest(b"Small Gods");
-/// let sig = RistrettoSchnorr::sign(k, r, &e);
+/// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e);
 /// ```
 ///
 /// # Verifying signatures
 ///
-/// Given a signature, (R,s) and a Challenge, e, you can verify that the signature is valid by calling the `verify`
-/// method:
+/// Given a signature, (R,u,v) and a Challenge, e, you can verify that the signature is valid by calling the
+/// `verify_challenge` method:
 ///
 /// ```edition2018
 /// # use tari_crypto::ristretto::*;
 /// # use tari_crypto::keys::*;
-/// # use tari_crypto::signatures::SchnorrSignature;
+/// # use tari_crypto::commitment::HomomorphicCommitment;
+/// # use tari_crypto::ristretto::pedersen::*;
+/// # use tari_crypto::commitment::HomomorphicCommitmentFactory;
 /// # use tari_crypto::common::*;
 /// # use tari_utilities::hex::*;
 /// # use tari_utilities::ByteArray;
 /// # use digest::Digest;
 ///
-/// # #[allow(non_snake_case)]
-/// let P = RistrettoPublicKey::from_hex("74896a30c89186b8194e25f8c1382f8d3081c5a182fb8f8a6d34f27fbefbfc70").unwrap();
-/// let R = RistrettoPublicKey::from_hex("fa14cb581ce5717248444721242e6b195a482d503a853dea4acb513074d8d803").unwrap();
-/// let s = RistrettoSecretKey::from_hex("bd0b253a619310340a4fa2de54cdd212eac7d088ee1dc47e305c3f6cbd020908").unwrap();
-/// let sig = RistrettoSchnorr::new(R, s);
+/// let mut rng = rand::thread_rng();
+/// let a_val = RistrettoSecretKey::random(&mut rng);
+/// let x_val = RistrettoSecretKey::random(&mut rng);
+/// let factory = PedersenCommitmentFactory::default();
+/// let commitment = factory.commit(&x_val, &a_val);
+/// let a_nonce = RistrettoSecretKey::random(&mut rng);
+/// let x_nonce = RistrettoSecretKey::random(&mut rng);
 /// let e = Blake256::digest(b"Maskerade");
-/// assert!(sig.verify_challenge(&P, &e));
+/// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e).unwrap();
+/// assert!(sig.verify_challenge(&commitment, &e));
 /// ```
 pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey, PedersenCommitmentFactory>;
 
@@ -104,17 +105,16 @@ mod test {
     use crate::{
         commitment::HomomorphicCommitmentFactory,
         common::Blake256,
-        keys::{PublicKey, SecretKey},
+        keys::SecretKey,
         ristretto::{
             pedersen::PedersenCommitment,
             ristretto_com_sig::PedersenCommitmentFactory,
             RistrettoComSig,
-            RistrettoPublicKey,
             RistrettoSecretKey,
         },
     };
     use digest::Digest;
-    use tari_utilities::{hex::from_hex, ByteArray};
+    use tari_utilities::ByteArray;
 
     #[test]
     fn default() {

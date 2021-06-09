@@ -130,7 +130,6 @@ where
     }
 }
 
-
 impl<P: PublicKey> Hash for HomomorphicCommitment<P> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.as_bytes())
