@@ -20,13 +20,14 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::keys::PublicKey;
+use crate::keys::{PublicKey, SecretKey};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    ops::{Add, Sub},
+    ops::{Add, Mul, Sub},
 };
+
 use tari_utilities::{ByteArray, ByteArrayError};
 
 /// A commitment is like a sealed envelope. You put some information inside the envelope, and then seal (commit) it.
@@ -114,6 +115,21 @@ where
         HomomorphicCommitment(&self.0 - &rhs.0)
     }
 }
+
+impl<'a, 'b, P, K> Mul<&'b K> for &'a HomomorphicCommitment<P>
+where
+    P: PublicKey<K = K>,
+    K: SecretKey,
+    &'b K: Mul<&'a P, Output = P>,
+{
+    type Output = HomomorphicCommitment<P>;
+
+    fn mul(self, rhs: &'b K) -> HomomorphicCommitment<P> {
+        let p = rhs * &self.0;
+        HomomorphicCommitment::<P>::from_public_key(&p)
+    }
+}
+
 
 impl<P: PublicKey> Hash for HomomorphicCommitment<P> {
     fn hash<H: Hasher>(&self, state: &mut H) {
