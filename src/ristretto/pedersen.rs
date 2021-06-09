@@ -109,7 +109,6 @@ where T: Borrow<PedersenCommitment>
 mod test {
     use super::*;
     use crate::keys::{PublicKey, SecretKey};
-    use rand;
     use std::convert::From;
     use tari_utilities::{message_format::MessageFormat, ByteArray};
 
@@ -153,7 +152,7 @@ mod test {
     #[allow(non_snake_case)]
     fn check_open() {
         let factory = PedersenCommitmentFactory::default();
-        let H = RISTRETTO_PEDERSEN_H.clone();
+        let H = *RISTRETTO_PEDERSEN_H;
         let mut rng = rand::thread_rng();
         for _ in 0..100 {
             let v = RistrettoSecretKey::random(&mut rng);
