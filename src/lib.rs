@@ -11,7 +11,7 @@ pub mod hash;
 pub mod keys;
 pub mod musig;
 pub mod range_proof;
-pub mod signatures;
+pub mod signature;
 
 // Implementations
 #[allow(clippy::op_ref)]
@@ -27,4 +27,5 @@ pub mod script;
 
 // Re-export tari_utils
 pub use hash::blake2 as common;
+pub use signature::schnorr as signatures;
 pub use tari_utilities;

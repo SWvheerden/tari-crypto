@@ -1,4 +1,4 @@
-// Copyright 2019 The Tari Project
+// Copyright 2021 The Tari Project
 //
 // Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 // following conditions are met:
@@ -22,12 +22,12 @@
 
 use crate::{
     ristretto::{RistrettoPublicKey, RistrettoSecretKey},
-    signatures::SchnorrSignature,
+    signature::CommitmentSignature,
 };
 
-/// # A Schnorr signature implementation on Ristretto
+/// # A Commitment signature implementation on Ristretto
 ///
-/// Find out more about [Schnorr signatures](https://tlu.tarilabs.com/cryptography/digital_signatures/introduction.html).
+/// Find out more about [Commitment signatures](https://tlu.tarilabs.com/cryptography/digital_signatures/introduction.html).
 ///
 /// `RistrettoSchnorr` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
 /// implementation of `ristretto255` to provide Schnorr signature functionality.

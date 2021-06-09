@@ -45,10 +45,8 @@ use tari_utilities::{ByteArray, ByteArrayError};
 ///   C_2 &= v_2.G + k_2.H \\\\
 ///   \therefore C_1 + C_2 &= (v_1 + v_2)G + (k_1 + k_2)H
 /// \end{aligned} $$
-#[derive(Debug, Eq, Clone, Serialize, Deserialize, Default)]
-#[serde(bound(deserialize = "P: PublicKey"))]
-pub struct HomomorphicCommitment<P>(pub(crate) P)
-where P: PublicKey;
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HomomorphicCommitment<P>(pub(crate) P);
 
 impl<P> HomomorphicCommitment<P>
 where P: PublicKey
@@ -129,23 +127,25 @@ impl<P: PublicKey> PartialEq for HomomorphicCommitment<P> {
     }
 }
 
+impl<P: PublicKey> Eq for HomomorphicCommitment<P> {}
+
 pub trait HomomorphicCommitmentFactory {
     type P: PublicKey;
 
-    /// Create a new commitment with the value and blinding factor provided. The implementing type will provide the
+    /// Create a new commitment with the blinding factor k and value v provided. The implementing type will provide the
     /// base values
     fn commit(&self, k: &<Self::P as PublicKey>::K, v: &<Self::P as PublicKey>::K) -> HomomorphicCommitment<Self::P>;
     /// return an identity point for addition using the specified base point. This is a commitment to zero with a zero
     /// blinding factor on the base point
     fn zero(&self) -> HomomorphicCommitment<Self::P>;
-    /// Test whether the given keys open the given commitment
+    /// Test whether the given blinding factor k and value v open the given commitment
     fn open(
         &self,
         k: &<Self::P as PublicKey>::K,
         v: &<Self::P as PublicKey>::K,
         commitment: &HomomorphicCommitment<Self::P>,
     ) -> bool;
-    /// Create a commitment from a spending key and a integer value
+    /// Create a commitment from a blinding factor k and a integer value
     fn commit_value(&self, k: &<Self::P as PublicKey>::K, value: u64) -> HomomorphicCommitment<Self::P>;
     /// Test whether the given private key and value open the given commitment
     fn open_value(&self, k: &<Self::P as PublicKey>::K, v: u64, commitment: &HomomorphicCommitment<Self::P>) -> bool;
