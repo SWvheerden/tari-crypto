@@ -33,8 +33,8 @@ use crate::{
 /// `RistrettoComSig` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
 /// implementation of `ristretto255` to provide Commitment Signature functionality utlizing Schnorr signatures.
 ///
-/// In short, a Commitment Signature signature is made up of the tuple _(R, u, v)_, where _R_ is a public key (of a secret nonce) and _s_ is
-/// the signature.
+/// In short, a Commitment Signature signature is made up of the tuple _(R, u, v)_, where _R_ is a public key (of a
+/// secret nonce) and _s_ is the signature.
 ///
 /// ## Creating signatures
 ///
@@ -102,6 +102,7 @@ pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecr
 #[cfg(test)]
 mod test {
     use crate::{
+        commitment::HomomorphicCommitmentFactory,
         common::Blake256,
         keys::{PublicKey, SecretKey},
         ristretto::{
@@ -111,7 +112,7 @@ mod test {
             RistrettoPublicKey,
             RistrettoSecretKey,
         },
-    };use crate::commitment::HomomorphicCommitmentFactory;
+    };
     use digest::Digest;
     use tari_utilities::{hex::from_hex, ByteArray};
 
@@ -119,9 +120,9 @@ mod test {
     fn default() {
         let sig = RistrettoComSig::default();
         let commitment = PedersenCommitment::default();
-        let (_,sig_1, sig_2) = sig.get_complete_signature_tuple();
+        let (_, sig_1, sig_2) = sig.get_complete_signature_tuple();
         assert_eq!(
-            (sig_1,sig_2),
+            (sig_1, sig_2),
             (&RistrettoSecretKey::default(), &RistrettoSecretKey::default())
         );
         assert_eq!(sig.get_public_commitment_nonce(), &commitment);
@@ -157,7 +158,7 @@ mod test {
         let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challange).unwrap();
         let R_calc = sig.get_public_commitment_nonce();
         assert_eq!(nonce_commitment, *R_calc);
-        let (_,sig_1, sig_2) = sig.get_complete_signature_tuple();
+        let (_, sig_1, sig_2) = sig.get_complete_signature_tuple();
         assert_eq!((sig_1, sig_2), (&u_value, &v_value));
         assert!(sig.verify_challenge(&commitment, &challange));
         // Doesn't work for invalid credentials

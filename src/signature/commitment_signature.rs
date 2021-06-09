@@ -113,7 +113,7 @@ where
     pub fn verify_challenge<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &[u8]) -> bool
     where
         for<'b> &'b K: Mul<&'a HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
-        for<'b> &'b HomomorphicCommitment<P>: Add<HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
+        for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
     {
         let e = match K::from_bytes(&challenge) {
             Ok(e) => e,
@@ -128,10 +128,10 @@ where
     pub fn verify<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &K) -> bool
     where
         for<'b> &'b K: Mul<&'a HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
-        for<'b> &'b HomomorphicCommitment<P>: Add<HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
+        for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
     {
         let lhs = self.calc_signature_verifier();
-        let rhs = &self.public_commitment_nonce + challenge * public_commitment;
+        let rhs = &self.public_commitment_nonce + &(challenge * public_commitment);
         // Implementors should make this a constant time comparison
         lhs == rhs
     }
