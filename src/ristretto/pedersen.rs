@@ -196,6 +196,30 @@ mod test {
         }
     }
 
+    /// Test addition of a public key to a homomorphic commitment.
+    /// $$
+    ///   C = C_1 + P = (v_1.H + k_1.G) + k_2.G = v_1.H + (k_1 + k_2).G
+    /// $$
+    /// and
+    /// `open(k1+k2, v1)` is true for _C_
+    #[test]
+    fn check_homomorphism_with_public_key() {
+        let mut rng = rand::thread_rng();
+        // Left-hand side
+        let v1 = RistrettoSecretKey::random(&mut rng);
+        let k1 = RistrettoSecretKey::random(&mut rng);
+        let factory = PedersenCommitmentFactory::default();
+        let c1 = factory.commit(&k1, &v1);
+        let k2 = RistrettoSecretKey::random(&mut rng);
+        let k2_pub = RistrettoPublicKey::from_secret_key(&k2);
+        let c_sum = &c1 + &k2_pub;
+        // Right-hand side
+        let c2 = factory.commit(&(&k1 + &k2), &v1);
+        // Test
+        assert_eq!(c_sum, c2);
+        assert!(factory.open(&(&k1 + &k2), &v1, &c2));
+    }
+
     #[test]
     fn sum_commitment_vector() {
         let mut rng = rand::thread_rng();

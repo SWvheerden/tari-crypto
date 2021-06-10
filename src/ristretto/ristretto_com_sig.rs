@@ -47,45 +47,22 @@ use crate::{
 /// # use tari_utilities::ByteArray;
 /// # use tari_utilities::hex::Hex;
 ///
-/// let r_pub_key = RistrettoPublicKey::from_hex("8063d85e151abee630e643e2b3dc47bfaeb8aa859c9d10d60847985f286aad19").unwrap();
-/// let r_pub = HomomorphicCommitment::from_public_key(&r_pub_key);
+/// let r_pub = HomomorphicCommitment::from_hex("8063d85e151abee630e643e2b3dc47bfaeb8aa859c9d10d60847985f286aad19").unwrap();
 /// let u = RistrettoSecretKey::from_bytes(b"10000000000000000000000010000000").unwrap();
 /// let v = RistrettoSecretKey::from_bytes(b"a00000000000000000000000a0000000").unwrap();
 /// let sig = RistrettoComSig::new(r_pub, u, v);
 /// ```
 ///
-/// or you can create a signature by signing a message with knowledge of a commitment:
+/// or you can create a signature for a commitment by signing a message with knowledge of the commitment and then
+/// verify it by calling the `verify_challenge` method:
 ///
 /// ```rust
 /// # use tari_crypto::ristretto::*;
 /// # use tari_crypto::keys::*;
 /// # use tari_crypto::common::*;
 /// # use digest::Digest;
-///
-/// let mut rng = rand::thread_rng();
-/// let a_val = RistrettoSecretKey::random(&mut rng);
-/// let x_val = RistrettoSecretKey::random(&mut rng);
-/// let a_nonce = RistrettoSecretKey::random(&mut rng);
-/// let x_nonce = RistrettoSecretKey::random(&mut rng);
-/// let e = Blake256::digest(b"Small Gods");
-/// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e);
-/// ```
-///
-/// # Verifying signatures
-///
-/// Given a signature, (R,u,v) and a Challenge, e, you can verify that the signature is valid by calling the
-/// `verify_challenge` method:
-///
-/// ```edition2018
-/// # use tari_crypto::ristretto::*;
-/// # use tari_crypto::keys::*;
-/// # use tari_crypto::commitment::HomomorphicCommitment;
-/// # use tari_crypto::ristretto::pedersen::*;
 /// # use tari_crypto::commitment::HomomorphicCommitmentFactory;
-/// # use tari_crypto::common::*;
-/// # use tari_utilities::hex::*;
-/// # use tari_utilities::ByteArray;
-/// # use digest::Digest;
+/// # use tari_crypto::ristretto::pedersen::*;
 ///
 /// let mut rng = rand::thread_rng();
 /// let a_val = RistrettoSecretKey::random(&mut rng);
@@ -96,6 +73,30 @@ use crate::{
 /// let x_nonce = RistrettoSecretKey::random(&mut rng);
 /// let e = Blake256::digest(b"Maskerade");
 /// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e).unwrap();
+/// assert!(sig.verify_challenge(&commitment, &e));
+/// ```
+///
+/// # Verifying signatures
+///
+/// Given a signature, (R,u,v), a commitment C and a Challenge, e, you can verify that the signature is valid by
+/// calling the `verify_challenge` method:
+///
+/// ```edition2018
+/// # use tari_crypto::ristretto::*;
+/// # use tari_crypto::keys::*;
+/// # use tari_crypto::commitment::HomomorphicCommitment;
+/// # use tari_crypto::ristretto::pedersen::*;
+/// # use tari_crypto::common::*;
+/// # use tari_utilities::hex::*;
+/// # use tari_utilities::ByteArray;
+/// # use digest::Digest;
+///
+/// let commitment = HomomorphicCommitment::from_hex("d6cca5cc4cc302c1854a118221d6cf64d100b7da76665dae5199368f3703c665").unwrap();
+/// let r_nonce = HomomorphicCommitment::from_hex("9607f72d84d704825864a4455c2325509ecc290eb9419bbce7ff05f1f578284c").unwrap();
+/// let u = RistrettoSecretKey::from_hex("0fd60e6479507fec35a46d2ec9da0ae300e9202e613e99b8f2b01d7ef6eccc02").unwrap();
+/// let v = RistrettoSecretKey::from_hex("9ae6621dd99ecc252b90a0eb69577c6f3d2e1e8abcdd43bfd0297afadf95fb0b").unwrap();
+/// let sig = RistrettoComSig::new(r_nonce, u, v);
+/// let e = Blake256::digest(b"Maskerade");
 /// assert!(sig.verify_challenge(&commitment, &e));
 /// ```
 pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey, PedersenCommitmentFactory>;

@@ -103,6 +103,19 @@ where
     }
 }
 
+/// Add a public key to a commitment. Note! There is no check that the bases are equal.
+impl<'a, 'b, P> Add<&'b P> for &'b HomomorphicCommitment<P>
+where
+    P: PublicKey,
+    &'b P: Add<&'b P, Output = P>,
+{
+    type Output = HomomorphicCommitment<P>;
+
+    fn add(self, rhs: &'b P) -> Self::Output {
+        HomomorphicCommitment(&self.0 + rhs)
+    }
+}
+
 /// Subtracts the left commitment from the right commitment. Note! There is no check that the bases are equal.
 impl<'b, P> Sub for &'b HomomorphicCommitment<P>
 where
@@ -116,6 +129,7 @@ where
     }
 }
 
+/// Multiply the commitment with a private key
 impl<'a, 'b, P, K> Mul<&'b K> for &'a HomomorphicCommitment<P>
 where
     P: PublicKey<K = K>,
