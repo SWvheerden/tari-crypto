@@ -210,8 +210,7 @@ mod test {
         let k1 = RistrettoSecretKey::random(&mut rng);
         let factory = PedersenCommitmentFactory::default();
         let c1 = factory.commit(&k1, &v1);
-        let k2 = RistrettoSecretKey::random(&mut rng);
-        let k2_pub = RistrettoPublicKey::from_secret_key(&k2);
+        let (k2, k2_pub) = RistrettoPublicKey::random_keypair(&mut rng);
         let c_sum = &c1 + &k2_pub;
         // Right-hand side
         let c2 = factory.commit(&(&k1 + &k2), &v1);

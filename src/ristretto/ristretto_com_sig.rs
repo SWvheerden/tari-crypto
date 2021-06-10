@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    ristretto::{pedersen::PedersenCommitmentFactory, RistrettoPublicKey, RistrettoSecretKey},
+    ristretto::{RistrettoPublicKey, RistrettoSecretKey},
     signatures::CommitmentSignature,
 };
 
@@ -72,8 +72,8 @@ use crate::{
 /// let a_nonce = RistrettoSecretKey::random(&mut rng);
 /// let x_nonce = RistrettoSecretKey::random(&mut rng);
 /// let e = Blake256::digest(b"Maskerade");
-/// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e).unwrap();
-/// assert!(sig.verify_challenge(&commitment, &e));
+/// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e, &factory).unwrap();
+/// assert!(sig.verify_challenge(&commitment, &e, &factory));
 /// ```
 ///
 /// # Verifying signatures
@@ -95,11 +95,12 @@ use crate::{
 /// let r_nonce = HomomorphicCommitment::from_hex("9607f72d84d704825864a4455c2325509ecc290eb9419bbce7ff05f1f578284c").unwrap();
 /// let u = RistrettoSecretKey::from_hex("0fd60e6479507fec35a46d2ec9da0ae300e9202e613e99b8f2b01d7ef6eccc02").unwrap();
 /// let v = RistrettoSecretKey::from_hex("9ae6621dd99ecc252b90a0eb69577c6f3d2e1e8abcdd43bfd0297afadf95fb0b").unwrap();
+/// let factory = PedersenCommitmentFactory::default();
 /// let sig = RistrettoComSig::new(r_nonce, u, v);
 /// let e = Blake256::digest(b"Maskerade");
-/// assert!(sig.verify_challenge(&commitment, &e));
+/// assert!(sig.verify_challenge(&commitment, &e,&factory));
 /// ```
-pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey, PedersenCommitmentFactory>;
+pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey>;
 
 #[cfg(test)]
 mod test {
@@ -108,8 +109,7 @@ mod test {
         common::Blake256,
         keys::SecretKey,
         ristretto::{
-            pedersen::PedersenCommitment,
-            ristretto_com_sig::PedersenCommitmentFactory,
+            pedersen::{PedersenCommitment, PedersenCommitmentFactory},
             RistrettoComSig,
             RistrettoSecretKey,
         },
@@ -156,17 +156,17 @@ mod test {
         let e_key = RistrettoSecretKey::from_bytes(&challenge).unwrap();
         let u_value = &k_1 + e_key.clone() * &x_value;
         let v_value = &k_2 + e_key * &a_value;
-        let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challenge).unwrap();
+        let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challenge, &factory).unwrap();
         let R_calc = sig.nonce();
         assert_eq!(nonce_commitment, *R_calc);
         let (_, sig_1, sig_2) = sig.complete_signature_tuple();
         assert_eq!((sig_1, sig_2), (&u_value, &v_value));
-        assert!(sig.verify_challenge(&commitment, &challenge));
+        assert!(sig.verify_challenge(&commitment, &challenge, &factory));
         // Doesn't work for invalid credentials
-        assert!(!sig.verify_challenge(&nonce_commitment, &challenge));
+        assert!(!sig.verify_challenge(&nonce_commitment, &challenge, &factory));
         // Doesn't work for different challenge
         let wrong_challenge = Blake256::digest(b"Guards! Guards!");
-        assert!(!sig.verify_challenge(&commitment, &wrong_challenge));
+        assert!(!sig.verify_challenge(&commitment, &wrong_challenge, &factory));
     }
 
     /// This test checks that the linearity of commitment Schnorr signatures hold, i.e. that s = s1 + s2 is validated by
@@ -199,14 +199,15 @@ mod test {
             .chain(b"Moving Pictures")
             .result();
         // Calculate Alice's signature
-        let sig_alice = RistrettoComSig::sign(a_value_alice, x_value_alice, k_2_alice, k_1_alice, &challenge).unwrap();
+        let sig_alice =
+            RistrettoComSig::sign(a_value_alice, x_value_alice, k_2_alice, k_1_alice, &challenge, &factory).unwrap();
         // Calculate Bob's signature
-        let sig_bob = RistrettoComSig::sign(a_value_bob, x_value_bob, k_2_bob, k_1_bob, &challenge).unwrap();
+        let sig_bob = RistrettoComSig::sign(a_value_bob, x_value_bob, k_2_bob, k_1_bob, &challenge, &factory).unwrap();
         // Now add the two signatures together
         let s_agg = &sig_alice + &sig_bob;
         // Check that the multi-sig verifies
         let combined_commitment = &commitment_alice + &commitment_bob;
-        assert!(s_agg.verify_challenge(&combined_commitment, &challenge));
+        assert!(s_agg.verify_challenge(&combined_commitment, &challenge, &factory));
     }
 
     /// Ristretto scalars have a max value 2^255. This test checks that hashed messages above this value can still be
@@ -214,11 +215,12 @@ mod test {
     #[test]
     fn challenge_from_invalid_scalar() {
         let mut rng = rand::thread_rng();
+        let factory = PedersenCommitmentFactory::default();
         let a_value = RistrettoSecretKey::random(&mut rng);
         let x_value = RistrettoSecretKey::random(&mut rng);
         let message = from_hex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
         let k_1 = RistrettoSecretKey::random(&mut rng);
         let k_2 = RistrettoSecretKey::random(&mut rng);
-        assert!(RistrettoComSig::sign(a_value, x_value, k_2, k_1, &message).is_ok());
+        assert!(RistrettoComSig::sign(a_value, x_value, k_2, k_1, &message, &factory).is_ok());
     }
 }

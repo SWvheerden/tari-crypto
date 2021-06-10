@@ -32,10 +32,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    marker::PhantomData,
     ops::{Add, Mul},
 };
-use tari_utilities::{hex::Hex, ByteArray};
+use tari_utilities::ByteArray;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq, Deserialize, Serialize)]
@@ -46,32 +45,25 @@ pub enum CommitmentSignatureError {
 
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitmentSignature<P, K, C> {
+pub struct CommitmentSignature<P, K> {
     nonce: HomomorphicCommitment<P>,
     u: K,
     v: K,
-    _commitment_factory: PhantomData<C>,
 }
 
-impl<P, K, C> CommitmentSignature<P, K, C>
+impl<P, K> CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     pub fn new(nonce: HomomorphicCommitment<P>, u: K, v: K) -> Self {
-        CommitmentSignature {
-            nonce,
-            u,
-            v,
-            _commitment_factory: PhantomData,
-        }
+        CommitmentSignature { nonce, u, v }
     }
 
     /// This is the left-hand side of the signature verification equation
-    pub fn calc_signature_verifier(&self) -> HomomorphicCommitment<P> {
+    pub fn calc_signature_verifier<C>(&self, factory: &C) -> HomomorphicCommitment<P>
+    where C: HomomorphicCommitmentFactory<P = P> {
         // v*H + u*G = Commitment
-        let factory = C::default();
         factory.commit(&self.u, &self.v)
     }
 
@@ -82,15 +74,17 @@ where
     ///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
     ///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
     ///   signature = (R, u, v)  ... (the final signature tuple)
-    pub fn sign(
+    pub fn sign<C>(
         secret_a: K,
         secret_x: K,
         nonce_a: K,
         nonce_x: K,
         challenge: &[u8],
+        factory: &C,
     ) -> Result<Self, CommitmentSignatureError>
     where
         K: Add<Output = K> + Mul<P, Output = P> + Mul<Output = K>,
+        C: HomomorphicCommitmentFactory<P = P>,
     {
         let e = match K::from_bytes(challenge) {
             Ok(e) => e,
@@ -102,7 +96,6 @@ where
         let v = nonce_a.clone() + ea;
         let u = nonce_x.clone() + ex;
 
-        let factory = C::default();
         let public_commitment_nonce = factory.commit(&nonce_x, &nonce_a);
 
         Ok(Self::new(public_commitment_nonce, u, v))
@@ -110,27 +103,34 @@ where
 
     /// Verify if the commitment signature signed the commitment using the specified challenge (as bytes). If the
     /// provided challenge n bytes cannot be converted to a secret key, this function also returns false.
-    pub fn verify_challenge<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &[u8]) -> bool
+    pub fn verify_challenge<'a, C>(
+        &self,
+        public_commitment: &'a HomomorphicCommitment<P>,
+        challenge: &[u8],
+        factory: &C,
+    ) -> bool
     where
         for<'b> &'a HomomorphicCommitment<P>: Mul<&'b K, Output = HomomorphicCommitment<P>>,
         for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
+        C: HomomorphicCommitmentFactory<P = P>,
     {
         let e = match K::from_bytes(&challenge) {
             Ok(e) => e,
             Err(_) => return false,
         };
 
-        self.verify(public_commitment, &e)
+        self.verify(public_commitment, &e, factory)
     }
 
     /// Verify if the commitment signature signed the commitment using the specified challenge (as secret key).
     ///   v*H + u*G = R + e.C
-    pub fn verify<'a>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &K) -> bool
+    pub fn verify<'a, C>(&self, public_commitment: &'a HomomorphicCommitment<P>, challenge: &K, factory: &C) -> bool
     where
         for<'b> &'a HomomorphicCommitment<P>: Mul<&'b K, Output = HomomorphicCommitment<P>>,
         for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
+        C: HomomorphicCommitmentFactory<P = P>,
     {
-        let lhs = self.calc_signature_verifier();
+        let lhs = self.calc_signature_verifier(factory);
         let rhs = &self.nonce + &(public_commitment * challenge);
         // Implementors should make this a constant time comparison
         lhs == rhs
@@ -161,17 +161,16 @@ where
     }
 }
 
-impl<'a, 'b, P, K, C> Add<&'b CommitmentSignature<P, K, C>> for &'a CommitmentSignature<P, K, C>
+impl<'a, 'b, P, K> Add<&'b CommitmentSignature<P, K>> for &'a CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     &'a HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
     K: SecretKey,
     &'a K: Add<&'b K, Output = K>,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
-    type Output = CommitmentSignature<P, K, C>;
+    type Output = CommitmentSignature<P, K>;
 
-    fn add(self, rhs: &'b CommitmentSignature<P, K, C>) -> CommitmentSignature<P, K, C> {
+    fn add(self, rhs: &'b CommitmentSignature<P, K>) -> CommitmentSignature<P, K> {
         let r_sum = self.nonce() + rhs.nonce();
         let s_u_sum = self.u() + rhs.u();
         let s_v_sum = self.v() + rhs.v();
@@ -179,17 +178,16 @@ where
     }
 }
 
-impl<'a, P, K, C> Add<CommitmentSignature<P, K, C>> for &'a CommitmentSignature<P, K, C>
+impl<'a, P, K> Add<CommitmentSignature<P, K>> for &'a CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     for<'b> &'a HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
     K: SecretKey,
     for<'b> &'a K: Add<&'b K, Output = K>,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
-    type Output = CommitmentSignature<P, K, C>;
+    type Output = CommitmentSignature<P, K>;
 
-    fn add(self, rhs: CommitmentSignature<P, K, C>) -> CommitmentSignature<P, K, C> {
+    fn add(self, rhs: CommitmentSignature<P, K>) -> CommitmentSignature<P, K> {
         let r_sum = self.nonce() + rhs.nonce();
         let s_u_sum = self.u() + rhs.u();
         let s_v_sum = self.v() + rhs.v();
@@ -197,11 +195,10 @@ where
     }
 }
 
-impl<P, K, C> Default for CommitmentSignature<P, K, C>
+impl<P, K> Default for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn default() -> Self {
         CommitmentSignature::new(HomomorphicCommitment::<P>::default(), K::default(), K::default())
@@ -212,24 +209,20 @@ where
 /// for secret keys, but in this instance, the signature is publicly known and is simply a scalar, so we use the hex
 /// representation of the scalar as the canonical ordering metric. This conversion is done if and only if the public
 /// nonces are already equal, otherwise the public nonce ordering determines the CommitmentSignature order.
-impl<P, K, C> Ord for CommitmentSignature<P, K, C>
+impl<P, K> Ord for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self
-            .nonce()
-            .cmp(&other.nonce())
-        {
+        match self.nonce().cmp(&other.nonce()) {
             Ordering::Equal => {
-                let this_u = self.u().to_hex();
-                let that_u = other.u().to_hex();
+                let this_u = self.u().as_bytes();
+                let that_u = other.u().as_bytes();
                 match this_u.cmp(&that_u) {
                     Ordering::Equal => {
-                        let this = self.v().to_hex();
-                        let that = other.v().to_hex();
+                        let this = self.v().as_bytes();
+                        let that = other.v().as_bytes();
                         this.cmp(&that)
                     },
                     v => v,
@@ -240,53 +233,39 @@ where
     }
 }
 
-impl<P, K, C> PartialOrd for CommitmentSignature<P, K, C>
+impl<P, K> PartialOrd for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<P, K, C> PartialEq for CommitmentSignature<P, K, C>
+impl<P, K> PartialEq for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.nonce()
-            .eq(other.nonce()) &&
-            self.u().eq(other.u()) &&
-            self.v().eq(other.v())
+        self.nonce().eq(other.nonce()) && self.u().eq(other.u()) && self.v().eq(other.v())
     }
 }
 
-impl<P, K, C> Eq for CommitmentSignature<P, K, C>
+impl<P, K> Eq for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
 }
 
-impl<P, K, C> Hash for CommitmentSignature<P, K, C>
+impl<P, K> Hash for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
-    C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(
-            &[
-                self.nonce().as_bytes(),
-                self.u().as_bytes(),
-                self.v().as_bytes(),
-            ]
-            .concat(),
-        )
+        state.write(&[self.nonce().as_bytes(), self.u().as_bytes(), self.v().as_bytes()].concat())
     }
 }

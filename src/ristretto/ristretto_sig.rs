@@ -141,9 +141,9 @@ mod test {
         assert!(!sig.verify_challenge(&P, &wrong_challenge));
     }
 
-    //noinspection DuplicatedCode
+    // noinspection DuplicatedCode
     /// This test checks that the linearity of Schnorr signatures hold, i.e. that s = s1 + s2 is validated by R1 + R2
-        /// and P1 + P2. We do this by hand here rather than using the APIs to guard against regressions
+    /// and P1 + P2. We do this by hand here rather than using the APIs to guard against regressions
     #[test]
     #[allow(non_snake_case)]
     fn test_signature_addition() {

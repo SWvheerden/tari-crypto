@@ -18,5 +18,5 @@
 mod commitment_signature;
 mod schnorr;
 
-pub use schnorr::*;
 pub use commitment_signature::*;
+pub use schnorr::*;
