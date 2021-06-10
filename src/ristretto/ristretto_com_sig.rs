@@ -22,7 +22,7 @@
 
 use crate::{
     ristretto::{pedersen::PedersenCommitmentFactory, RistrettoPublicKey, RistrettoSecretKey},
-    signature::commitment_signature::CommitmentSignature,
+    signatures::CommitmentSignature,
 };
 
 /// # A Commitment signature implementation on Ristretto
@@ -121,12 +121,12 @@ mod test {
     fn default() {
         let sig = RistrettoComSig::default();
         let commitment = PedersenCommitment::default();
-        let (_, sig_1, sig_2) = sig.get_complete_signature_tuple();
+        let (_, sig_1, sig_2) = sig.complete_signature_tuple();
         assert_eq!(
             (sig_1, sig_2),
             (&RistrettoSecretKey::default(), &RistrettoSecretKey::default())
         );
-        assert_eq!(sig.get_public_commitment_nonce(), &commitment);
+        assert_eq!(sig.nonce(), &commitment);
     }
 
     // C = a*H + x*G     ... (Pedersen commitment to the value 'a')
@@ -148,22 +148,22 @@ mod test {
         let k_2 = RistrettoSecretKey::random(&mut rng);
         let nonce_commitment = factory.commit(&k_1, &k_2);
 
-        let challange = Blake256::new()
+        let challenge = Blake256::new()
             .chain(commitment.as_bytes())
             .chain(nonce_commitment.as_bytes())
             .chain(b"Small Gods")
             .result();
-        let e_key = RistrettoSecretKey::from_bytes(&challange).unwrap();
+        let e_key = RistrettoSecretKey::from_bytes(&challenge).unwrap();
         let u_value = &k_1 + e_key.clone() * &x_value;
         let v_value = &k_2 + e_key * &a_value;
-        let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challange).unwrap();
-        let R_calc = sig.get_public_commitment_nonce();
+        let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challenge).unwrap();
+        let R_calc = sig.nonce();
         assert_eq!(nonce_commitment, *R_calc);
-        let (_, sig_1, sig_2) = sig.get_complete_signature_tuple();
+        let (_, sig_1, sig_2) = sig.complete_signature_tuple();
         assert_eq!((sig_1, sig_2), (&u_value, &v_value));
-        assert!(sig.verify_challenge(&commitment, &challange));
+        assert!(sig.verify_challenge(&commitment, &challenge));
         // Doesn't work for invalid credentials
-        assert!(!sig.verify_challenge(&nonce_commitment, &challange));
+        assert!(!sig.verify_challenge(&nonce_commitment, &challenge));
         // Doesn't work for different challenge
         let wrong_challenge = Blake256::digest(b"Guards! Guards!");
         assert!(!sig.verify_challenge(&commitment, &wrong_challenge));
@@ -191,7 +191,7 @@ mod test {
         let k_2_bob = RistrettoSecretKey::random(&mut rng);
         let nonce_commitment_bob = factory.commit(&k_1_bob, &k_2_bob);
         // Each of them creates the Challenge committing to both commitments of both parties
-        let challange = Blake256::new()
+        let challenge = Blake256::new()
             .chain(commitment_alice.as_bytes())
             .chain(commitment_bob.as_bytes())
             .chain(nonce_commitment_alice.as_bytes())
@@ -199,14 +199,14 @@ mod test {
             .chain(b"Moving Pictures")
             .result();
         // Calculate Alice's signature
-        let sig_alice = RistrettoComSig::sign(a_value_alice, x_value_alice, k_2_alice, k_1_alice, &challange).unwrap();
+        let sig_alice = RistrettoComSig::sign(a_value_alice, x_value_alice, k_2_alice, k_1_alice, &challenge).unwrap();
         // Calculate Bob's signature
-        let sig_bob = RistrettoComSig::sign(a_value_bob, x_value_bob, k_2_bob, k_1_bob, &challange).unwrap();
+        let sig_bob = RistrettoComSig::sign(a_value_bob, x_value_bob, k_2_bob, k_1_bob, &challenge).unwrap();
         // Now add the two signatures together
         let s_agg = &sig_alice + &sig_bob;
         // Check that the multi-sig verifies
         let combined_commitment = &commitment_alice + &commitment_bob;
-        assert!(s_agg.verify_challenge(&combined_commitment, &challange));
+        assert!(s_agg.verify_challenge(&combined_commitment, &challenge));
     }
 
     /// Ristretto scalars have a max value 2^255. This test checks that hashed messages above this value can still be

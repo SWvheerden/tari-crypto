@@ -47,9 +47,9 @@ pub enum CommitmentSignatureError {
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitmentSignature<P, K, C> {
-    public_commitment_nonce: HomomorphicCommitment<P>,
-    signature_u: K,
-    signature_v: K,
+    nonce: HomomorphicCommitment<P>,
+    u: K,
+    v: K,
     _commitment_factory: PhantomData<C>,
 }
 
@@ -59,11 +59,11 @@ where
     K: SecretKey,
     C: HomomorphicCommitmentFactory<P = P> + Default,
 {
-    pub fn new(public_commitment_nonce: HomomorphicCommitment<P>, signature_u: K, signature_v: K) -> Self {
+    pub fn new(nonce: HomomorphicCommitment<P>, u: K, v: K) -> Self {
         CommitmentSignature {
-            public_commitment_nonce,
-            signature_u,
-            signature_v,
+            nonce,
+            u,
+            v,
             _commitment_factory: PhantomData,
         }
     }
@@ -72,7 +72,7 @@ where
     pub fn calc_signature_verifier(&self) -> HomomorphicCommitment<P> {
         // v*H + u*G = Commitment
         let factory = C::default();
-        factory.commit(&self.signature_u, &self.signature_v)
+        factory.commit(&self.u, &self.v)
     }
 
     /// Sign the provided challenge with the value commitment's value and blinding factor. The two nonces should be
@@ -131,33 +131,33 @@ where
         for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
     {
         let lhs = self.calc_signature_verifier();
-        let rhs = &self.public_commitment_nonce + &(public_commitment * challenge);
+        let rhs = &self.nonce + &(public_commitment * challenge);
         // Implementors should make this a constant time comparison
         lhs == rhs
     }
 
     /// This function returns the complete signature tuple (R, u, v)
     #[inline]
-    pub fn get_complete_signature_tuple(&self) -> (&HomomorphicCommitment<P>, &K, &K) {
-        (&self.public_commitment_nonce, &self.signature_u, &self.signature_v)
+    pub fn complete_signature_tuple(&self) -> (&HomomorphicCommitment<P>, &K, &K) {
+        (&self.nonce, &self.u, &self.v)
     }
 
     /// This function returns the first publicly known private key of the signature tuple (u)
     #[inline]
-    pub fn get_signature_u(&self) -> &K {
-        &self.signature_u
+    pub fn u(&self) -> &K {
+        &self.u
     }
 
     /// This function returns the second publicly known private key of the signature tuple (v)
     #[inline]
-    pub fn get_signature_v(&self) -> &K {
-        &self.signature_v
+    pub fn v(&self) -> &K {
+        &self.v
     }
 
     /// This function returns the public commitment nonce of the signature tuple (R)
     #[inline]
-    pub fn get_public_commitment_nonce(&self) -> &HomomorphicCommitment<P> {
-        &self.public_commitment_nonce
+    pub fn nonce(&self) -> &HomomorphicCommitment<P> {
+        &self.nonce
     }
 }
 
@@ -172,9 +172,9 @@ where
     type Output = CommitmentSignature<P, K, C>;
 
     fn add(self, rhs: &'b CommitmentSignature<P, K, C>) -> CommitmentSignature<P, K, C> {
-        let r_sum = self.get_public_commitment_nonce() + rhs.get_public_commitment_nonce();
-        let s_u_sum = self.get_signature_u() + rhs.get_signature_u();
-        let s_v_sum = self.get_signature_v() + rhs.get_signature_v();
+        let r_sum = self.nonce() + rhs.nonce();
+        let s_u_sum = self.u() + rhs.u();
+        let s_v_sum = self.v() + rhs.v();
         CommitmentSignature::new(r_sum, s_u_sum, s_v_sum)
     }
 }
@@ -190,9 +190,9 @@ where
     type Output = CommitmentSignature<P, K, C>;
 
     fn add(self, rhs: CommitmentSignature<P, K, C>) -> CommitmentSignature<P, K, C> {
-        let r_sum = self.get_public_commitment_nonce() + rhs.get_public_commitment_nonce();
-        let s_u_sum = self.get_signature_u() + rhs.get_signature_u();
-        let s_v_sum = self.get_signature_v() + rhs.get_signature_v();
+        let r_sum = self.nonce() + rhs.nonce();
+        let s_u_sum = self.u() + rhs.u();
+        let s_v_sum = self.v() + rhs.v();
         CommitmentSignature::new(r_sum, s_u_sum, s_v_sum)
     }
 }
@@ -220,16 +220,16 @@ where
 {
     fn cmp(&self, other: &Self) -> Ordering {
         match self
-            .get_public_commitment_nonce()
-            .cmp(&other.get_public_commitment_nonce())
+            .nonce()
+            .cmp(&other.nonce())
         {
             Ordering::Equal => {
-                let this_u = self.get_signature_u().to_hex();
-                let that_u = other.get_signature_u().to_hex();
+                let this_u = self.u().to_hex();
+                let that_u = other.u().to_hex();
                 match this_u.cmp(&that_u) {
                     Ordering::Equal => {
-                        let this = self.get_signature_v().to_hex();
-                        let that = other.get_signature_v().to_hex();
+                        let this = self.v().to_hex();
+                        let that = other.v().to_hex();
                         this.cmp(&that)
                     },
                     v => v,
@@ -258,10 +258,10 @@ where
     C: HomomorphicCommitmentFactory<P = P> + Default,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.get_public_commitment_nonce()
-            .eq(other.get_public_commitment_nonce()) &&
-            self.get_signature_u().eq(other.get_signature_u()) &&
-            self.get_signature_v().eq(other.get_signature_v())
+        self.nonce()
+            .eq(other.nonce()) &&
+            self.u().eq(other.u()) &&
+            self.v().eq(other.v())
     }
 }
 
@@ -282,9 +282,9 @@ where
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(
             &[
-                self.get_public_commitment_nonce().as_bytes(),
-                self.get_signature_u().as_bytes(),
-                self.get_signature_v().as_bytes(),
+                self.nonce().as_bytes(),
+                self.u().as_bytes(),
+                self.v().as_bytes(),
             ]
             .concat(),
         )

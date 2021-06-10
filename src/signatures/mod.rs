@@ -15,5 +15,8 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub mod commitment_signature;
-pub mod schnorr;
+mod commitment_signature;
+mod schnorr;
+
+pub use schnorr::*;
+pub use commitment_signature::*;
