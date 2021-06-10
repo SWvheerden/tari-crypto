@@ -46,7 +46,7 @@ pub enum CommitmentSignatureError {
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitmentSignature<P, K> {
-    nonce: HomomorphicCommitment<P>,
+    public_nonce: HomomorphicCommitment<P>,
     u: K,
     v: K,
 }
@@ -56,8 +56,8 @@ where
     P: PublicKey<K = K>,
     K: SecretKey,
 {
-    pub fn new(nonce: HomomorphicCommitment<P>, u: K, v: K) -> Self {
-        CommitmentSignature { nonce, u, v }
+    pub fn new(public_nonce: HomomorphicCommitment<P>, u: K, v: K) -> Self {
+        CommitmentSignature { public_nonce, u, v }
     }
 
     /// This is the left-hand side of the signature verification equation
@@ -70,7 +70,7 @@ where
     /// Sign the provided challenge with the value commitment's value and blinding factor. The two nonces should be
     /// completely random and never reused - that responsibility lies with the calling function.
     ///   C = a*H + x*G          ... (Pedersen commitment to the value 'a' using blinding factor 'x')
-    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment nonce created with the two random nonces)
+    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment public_nonce created with the two random nonces)
     ///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
     ///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
     ///   signature = (R, u, v)  ... (the final signature tuple)
@@ -83,18 +83,20 @@ where
         factory: &C,
     ) -> Result<Self, CommitmentSignatureError>
     where
-        K: Add<Output = K> + Mul<P, Output = P> + Mul<Output = K>,
+        K: Mul<P, Output = P>,
+        for<'a> &'a K: Add<&'a K, Output = K>,
+        for<'a> &'a K: Mul<&'a K, Output = K>,
         C: HomomorphicCommitmentFactory<P = P>,
     {
         let e = match K::from_bytes(challenge) {
             Ok(e) => e,
             Err(_) => return Err(CommitmentSignatureError::InvalidChallenge),
         };
-        let ea = e.clone() * secret_a;
-        let ex = e * secret_x;
+        let ea = &e * &secret_a;
+        let ex = &e * &secret_x;
 
-        let v = nonce_a.clone() + ea;
-        let u = nonce_x.clone() + ex;
+        let v = &nonce_a + &ea;
+        let u = &nonce_x + &ex;
 
         let public_commitment_nonce = factory.commit(&nonce_x, &nonce_a);
 
@@ -131,7 +133,7 @@ where
         C: HomomorphicCommitmentFactory<P = P>,
     {
         let lhs = self.calc_signature_verifier(factory);
-        let rhs = &self.nonce + &(public_commitment * challenge);
+        let rhs = &self.public_nonce + &(public_commitment * challenge);
         // Implementors should make this a constant time comparison
         lhs == rhs
     }
@@ -139,7 +141,7 @@ where
     /// This function returns the complete signature tuple (R, u, v)
     #[inline]
     pub fn complete_signature_tuple(&self) -> (&HomomorphicCommitment<P>, &K, &K) {
-        (&self.nonce, &self.u, &self.v)
+        (&self.public_nonce, &self.u, &self.v)
     }
 
     /// This function returns the first publicly known private key of the signature tuple (u)
@@ -154,10 +156,10 @@ where
         &self.v
     }
 
-    /// This function returns the public commitment nonce of the signature tuple (R)
+    /// This function returns the public commitment public_nonce of the signature tuple (R)
     #[inline]
     pub fn nonce(&self) -> &HomomorphicCommitment<P> {
-        &self.nonce
+        &self.public_nonce
     }
 }
 
@@ -208,7 +210,7 @@ where
 /// Provide an efficient ordering algorithm for Commitment signatures. It's probably not a good idea to implement `Ord`
 /// for secret keys, but in this instance, the signature is publicly known and is simply a scalar, so we use the hex
 /// representation of the scalar as the canonical ordering metric. This conversion is done if and only if the public
-/// nonces are already equal, otherwise the public nonce ordering determines the CommitmentSignature order.
+/// nonces are already equal, otherwise the public public_nonce ordering determines the CommitmentSignature order.
 impl<P, K> Ord for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
