@@ -70,7 +70,7 @@ where
     /// Sign the provided challenge with the value commitment's value and blinding factor. The two nonces should be
     /// completely random and never reused - that responsibility lies with the calling function.
     ///   C = a*H + x*G          ... (Pedersen commitment to the value 'a' using blinding factor 'x')
-    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment public_nonce created with the two random nonces)
+    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment nonce created with the two random nonces)
     ///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
     ///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
     ///   signature = (R, u, v)  ... (the final signature tuple)
@@ -158,7 +158,7 @@ where
 
     /// This function returns the public commitment public_nonce of the signature tuple (R)
     #[inline]
-    pub fn nonce(&self) -> &HomomorphicCommitment<P> {
+    pub fn public_nonce(&self) -> &HomomorphicCommitment<P> {
         &self.public_nonce
     }
 }
@@ -173,7 +173,7 @@ where
     type Output = CommitmentSignature<P, K>;
 
     fn add(self, rhs: &'b CommitmentSignature<P, K>) -> CommitmentSignature<P, K> {
-        let r_sum = self.nonce() + rhs.nonce();
+        let r_sum = self.public_nonce() + rhs.public_nonce();
         let s_u_sum = self.u() + rhs.u();
         let s_v_sum = self.v() + rhs.v();
         CommitmentSignature::new(r_sum, s_u_sum, s_v_sum)
@@ -190,7 +190,7 @@ where
     type Output = CommitmentSignature<P, K>;
 
     fn add(self, rhs: CommitmentSignature<P, K>) -> CommitmentSignature<P, K> {
-        let r_sum = self.nonce() + rhs.nonce();
+        let r_sum = self.public_nonce() + rhs.public_nonce();
         let s_u_sum = self.u() + rhs.u();
         let s_v_sum = self.v() + rhs.v();
         CommitmentSignature::new(r_sum, s_u_sum, s_v_sum)
@@ -208,16 +208,16 @@ where
 }
 
 /// Provide an efficient ordering algorithm for Commitment signatures. It's probably not a good idea to implement `Ord`
-/// for secret keys, but in this instance, the signature is publicly known and is simply a scalar, so we use the hex
+/// for secret keys, but in this instance, the signature is publicly known and is simply a scalar, so we use the bytes
 /// representation of the scalar as the canonical ordering metric. This conversion is done if and only if the public
-/// nonces are already equal, otherwise the public public_nonce ordering determines the CommitmentSignature order.
+/// nonces are already equal, otherwise the public nonce ordering determines the CommitmentSignature order.
 impl<P, K> Ord for CommitmentSignature<P, K>
 where
     P: PublicKey<K = K>,
     K: SecretKey,
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.nonce().cmp(&other.nonce()) {
+        match self.public_nonce().cmp(&other.public_nonce()) {
             Ordering::Equal => {
                 let this_u = self.u().as_bytes();
                 let that_u = other.u().as_bytes();
@@ -251,7 +251,7 @@ where
     K: SecretKey,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.nonce().eq(other.nonce()) && self.u().eq(other.u()) && self.v().eq(other.v())
+        self.public_nonce().eq(other.public_nonce()) && self.u().eq(other.u()) && self.v().eq(other.v())
     }
 }
 
@@ -268,6 +268,6 @@ where
     K: SecretKey,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&[self.nonce().as_bytes(), self.u().as_bytes(), self.v().as_bytes()].concat())
+        state.write(&[self.public_nonce().as_bytes(), self.u().as_bytes(), self.v().as_bytes()].concat())
     }
 }
