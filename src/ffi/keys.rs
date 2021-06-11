@@ -16,7 +16,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    commitment::HomomorphicCommitment,
+    commitment::{HomomorphicCommitment, HomomorphicCommitmentFactory},
     ffi::error::{INVALID_SECRET_KEY_SER, NULL_POINTER, OK, SIGNING_ERROR, STR_CONV_ERR},
     hash::blake2::Blake256,
     keys::{PublicKey, SecretKey},
@@ -59,6 +59,7 @@ pub unsafe extern "C" fn random_keypair(priv_key: *mut KeyArray, pub_key: *mut K
     OK
 }
 
+/// Generate a Schnorr signature (s, R) using the provided private key and challenge (k, e).
 #[no_mangle]
 pub unsafe extern "C" fn sign(
     priv_key: *const KeyArray,
@@ -89,6 +90,7 @@ pub unsafe extern "C" fn sign(
     OK
 }
 
+/// Verify that a Schnorr signature (s, R) is valid for the provided public key and challenge (P, e).
 #[no_mangle]
 pub unsafe extern "C" fn verify(
     pub_key: *const KeyArray,
@@ -130,6 +132,32 @@ pub unsafe extern "C" fn verify(
     sig.verify(&pk, &challenge)
 }
 
+/// Generate a Pedersen commitment (C) using the provided value and spending key (a, x).
+#[no_mangle]
+pub unsafe extern "C" fn commitment(
+    value: *const KeyArray,
+    spend_key: *const KeyArray,
+    commitment: *mut KeyArray,
+) -> c_int
+{
+    if value.is_null() || spend_key.is_null() || spend_key.is_null() {
+        return NULL_POINTER;
+    }
+    let value = match RistrettoSecretKey::from_bytes(&(*value)) {
+        Ok(k) => k,
+        _ => return INVALID_SECRET_KEY_SER,
+    };
+    let spend_key = match RistrettoSecretKey::from_bytes(&(*spend_key)) {
+        Ok(k) => k,
+        _ => return INVALID_SECRET_KEY_SER,
+    };
+    let factory = PedersenCommitmentFactory::default();
+    let c = factory.commit(&spend_key, &value);
+    (*commitment).copy_from_slice(c.as_bytes());
+    OK
+}
+
+/// Generate a commitment signature (R, u, v) using the provided value, spending key and challenge (a, x, e).
 #[no_mangle]
 pub unsafe extern "C" fn sign_comsig(
     secret_a: *const KeyArray,
@@ -175,13 +203,14 @@ pub unsafe extern "C" fn sign_comsig(
     OK
 }
 
+/// Verify that a commitment signature (R, u, v) is valid for the provided commitment and challenge (C, e).
 #[no_mangle]
 pub unsafe extern "C" fn verify_comsig(
     commitment: *const KeyArray,
     msg: *const c_char,
-    public_nonce: *mut KeyArray,
-    signature_u: *mut KeyArray,
-    signature_v: *mut KeyArray,
+    public_nonce: *const KeyArray,
+    signature_u: *const KeyArray,
+    signature_v: *const KeyArray,
     err_code: *mut c_int,
 ) -> bool
 {

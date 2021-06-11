@@ -43,6 +43,26 @@ pub enum CommitmentSignatureError {
     InvalidChallenge,
 }
 
+/// # Commitment Signatures
+///
+/// Find out more about Commitment signatures [here](https://eprint.iacr.org/2020/061.pdf) and
+/// [here](https://documents.uow.edu.au/~wsusilo/ZCMS_IJNS08.pdf).
+///
+/// In short, a Commitment Signature is made up of the tuple _(R, u, v)_, where _R_ is a random Pedersen commitment (of
+/// two secret nonces) and _u_ and _v_ are the two publicly known private signature keys. It demonstrates ownership of 
+/// a specific commitment.
+///
+/// The Commitment Signature signes a challenge with the value commitment's value and blinding factor. The two nonces 
+/// should be completely random and never reused - that responsibility lies with the calling function.
+///   C = a*H + x*G          ... (Pedersen commitment to the value 'a' using blinding factor 'x')
+///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment nonce created with the two random nonces)
+///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
+///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
+///   signature = (R, u, v)  ... (the final signature tuple)
+///
+/// Verification of the Commitment Signature (R, u, v) entails the following:
+///   S = v*H + u*G          ... (Pedersen commitment of the publicly known private signature keys)
+///   S =? R + e.C           ... (final verification)
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitmentSignature<P, K> {
@@ -63,17 +83,12 @@ where
     /// This is the left-hand side of the signature verification equation
     pub fn calc_signature_verifier<C>(&self, factory: &C) -> HomomorphicCommitment<P>
     where C: HomomorphicCommitmentFactory<P = P> {
-        // v*H + u*G = Commitment
+        // v*H + u*G
         factory.commit(&self.u, &self.v)
     }
 
     /// Sign the provided challenge with the value commitment's value and blinding factor. The two nonces should be
     /// completely random and never reused - that responsibility lies with the calling function.
-    ///   C = a*H + x*G          ... (Pedersen commitment to the value 'a' using blinding factor 'x')
-    ///   R = k_2*H + k_1*G      ... (a public (Pedersen) commitment nonce created with the two random nonces)
-    ///   u = k_1 + e.x          ... (the first publicly known private key of the signature signing with 'x')
-    ///   v = k_2 + e.a          ... (the second publicly known private key of the signature signing with 'a')
-    ///   signature = (R, u, v)  ... (the final signature tuple)
     pub fn sign<C>(
         secret_a: K,
         secret_x: K,
@@ -132,7 +147,9 @@ where
         for<'b> &'b HomomorphicCommitment<P>: Add<&'b HomomorphicCommitment<P>, Output = HomomorphicCommitment<P>>,
         C: HomomorphicCommitmentFactory<P = P>,
     {
+        // v*H + u*G
         let lhs = self.calc_signature_verifier(factory);
+        // R + e.C
         let rhs = &self.public_nonce + &(public_commitment * challenge);
         // Implementors should make this a constant time comparison
         lhs == rhs

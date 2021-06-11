@@ -27,16 +27,10 @@ use crate::{
 
 /// # A Commitment signature implementation on Ristretto
 ///
-/// Find out more about Commitment signatures [here](https://eprint.iacr.org/2020/061.pdf) and
-/// [here](https://documents.uow.edu.au/~wsusilo/ZCMS_IJNS08.pdf).
-///
 /// `RistrettoComSig` utilises the [curve25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek1)
 /// implementation of `ristretto255` to provide Commitment Signature functionality utlizing Schnorr signatures.
 ///
-/// In short, a Commitment Signature is made up of the tuple _(R, u, v)_, where _R_ is a random Pedersen commitment (of
-/// two secret nonces) and _u_ and _v_ are the two publicly known private keys.
-///
-/// ## Creating signatures
+/// ## Examples
 ///
 /// You can create a `RistrettoComSig` from it's component parts:
 ///
@@ -100,6 +94,7 @@ use crate::{
 /// let factory = PedersenCommitmentFactory::default();
 /// assert!(sig.verify_challenge(&commitment, &e, &factory));
 /// ```
+
 pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey>;
 
 #[cfg(test)]
