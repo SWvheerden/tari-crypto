@@ -65,6 +65,14 @@ int main() {
     } else {
         printf("FAILED\n");
     }
+    if (code) {
+        printf("Error code: %d\n", code);
+        return code;
+    }
+
+    // Demonstrate the commitment signature
+    // TODO: Hansie.... Add commitment signature usage and verification
+
     return code;
 }
 

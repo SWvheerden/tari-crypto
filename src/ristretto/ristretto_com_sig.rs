@@ -67,11 +67,11 @@ use crate::{
 /// let mut rng = rand::thread_rng();
 /// let a_val = RistrettoSecretKey::random(&mut rng);
 /// let x_val = RistrettoSecretKey::random(&mut rng);
-/// let factory = PedersenCommitmentFactory::default();
-/// let commitment = factory.commit(&x_val, &a_val);
 /// let a_nonce = RistrettoSecretKey::random(&mut rng);
 /// let x_nonce = RistrettoSecretKey::random(&mut rng);
 /// let e = Blake256::digest(b"Maskerade");
+/// let factory = PedersenCommitmentFactory::default();
+/// let commitment = factory.commit(&x_val, &a_val);
 /// let sig = RistrettoComSig::sign(a_val, x_val, a_nonce, x_nonce, &e, &factory).unwrap();
 /// assert!(sig.verify_challenge(&commitment, &e, &factory));
 /// ```
@@ -95,10 +95,10 @@ use crate::{
 /// let r_nonce = HomomorphicCommitment::from_hex("9607f72d84d704825864a4455c2325509ecc290eb9419bbce7ff05f1f578284c").unwrap();
 /// let u = RistrettoSecretKey::from_hex("0fd60e6479507fec35a46d2ec9da0ae300e9202e613e99b8f2b01d7ef6eccc02").unwrap();
 /// let v = RistrettoSecretKey::from_hex("9ae6621dd99ecc252b90a0eb69577c6f3d2e1e8abcdd43bfd0297afadf95fb0b").unwrap();
-/// let factory = PedersenCommitmentFactory::default();
 /// let sig = RistrettoComSig::new(r_nonce, u, v);
 /// let e = Blake256::digest(b"Maskerade");
-/// assert!(sig.verify_challenge(&commitment, &e,&factory));
+/// let factory = PedersenCommitmentFactory::default();
+/// assert!(sig.verify_challenge(&commitment, &e, &factory));
 /// ```
 pub type RistrettoComSig = CommitmentSignature<RistrettoPublicKey, RistrettoSecretKey>;
 
@@ -126,14 +126,9 @@ mod test {
             (sig_1, sig_2),
             (&RistrettoSecretKey::default(), &RistrettoSecretKey::default())
         );
-        assert_eq!(sig.nonce(), &commitment);
+        assert_eq!(sig.public_nonce(), &commitment);
     }
 
-    // C = a*H + x*G     ... (Pedersen commitment to the value 'a')
-    // R = k_2*H + k_1*G
-    // u = k_1 + e.x
-    // v = k_2 + e.a
-    // signature = (R, u, v)
     /// Create a signature, and then verify it. Also checks that some invalid signatures fail to verify
     #[test]
     #[allow(non_snake_case)]
@@ -157,7 +152,7 @@ mod test {
         let u_value = &k_1 + e_key.clone() * &x_value;
         let v_value = &k_2 + e_key * &a_value;
         let sig = RistrettoComSig::sign(a_value, x_value, k_2, k_1, &challenge, &factory).unwrap();
-        let R_calc = sig.nonce();
+        let R_calc = sig.public_nonce();
         assert_eq!(nonce_commitment, *R_calc);
         let (_, sig_1, sig_2) = sig.complete_signature_tuple();
         assert_eq!((sig_1, sig_2), (&u_value, &v_value));
